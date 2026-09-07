@@ -33,8 +33,14 @@ The package depends only on R's recommended components and does not require `ggp
 ## Installation
 
 ```r
+# GitHub (short form; installs the default branch)
+pak::pak("anhuikylin/LDblockR")
+
+# GitHub (explicitly install master)
+# pak::pak("anhuikylin/LDblockR@master")
+
 # Preferred source (Gitee)
-pak::pak("git::https://gitee.com/anhuikylin/LDblockR.git")
+# pak::pak("git::https://gitee.com/anhuikylin/LDblockR.git")
 
 # Public GitHub mirror
 # pak::pak("git::https://github.com/anhuikylin/LDblockR.git")
