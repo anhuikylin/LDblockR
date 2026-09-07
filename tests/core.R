@@ -82,6 +82,10 @@ haps <- haplotype_frequencies(x, 1:5)
 stopifnot(abs(sum(haps$frequency) - 1) < 0.1, all(haps$frequency >= 0.01))
 block_haps <- haplotype_frequencies(x, "snp1|snp2|snp3")
 stopifnot(identical(attr(block_haps, "variants"), c("snp1", "snp2", "snp3")))
+empty_variant_message <- tryCatch(haplotype_frequencies(x, character()),
+                                  error = function(e) conditionMessage(e))
+stopifnot(is.character(empty_variant_message),
+          grepl("No variants were supplied", empty_variant_message, fixed = TRUE))
 decay <- ld_decay(ld, "r2", n_bins = 12L)
 stopifnot(nrow(decay) > 1L, all(decay$n_pairs > 0L))
 

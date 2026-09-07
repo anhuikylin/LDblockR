@@ -266,6 +266,12 @@ save_ld_plot(p, "Figure_EarHT_LD.pdf", width = 8.5, height = 7.2)
 save_ld_plot(p, "Figure_EarHT_LD.svg", width = 8.5, height = 7.2)
 ```
 
+`gabriel`、`solid_spine`、`strong` 等数据驱动方法在阈值严格或区域较小时可能返回
+0 行区块，这是正常结果。计算单倍型前不要直接访问 `blocks$snps[1]`，应先判断
+`nrow(blocks) > 0`；如果需要复现内置区域示例，可读取 `regional[["fixed_blocks"]]`
+并使用 `detect_ld_blocks(ld, method = "fixed", fixed = fixed)`，且固定区间的染色体和坐标必须
+与 `ld$data$variants` 一致。
+
 这里的 `gwas` 与 `paths[["mdp_genotype"]]` 必须来自同一基因型面板；如果使用内置区域
 示例的 `regional_gwas.tsv`，应同时使用 `example_data("regional")` 返回的
 `regional[["hapmap"]]`，不要与 TASSEL 的 `mdp_genotype.hmp.txt` 混用。区域读取会兼容

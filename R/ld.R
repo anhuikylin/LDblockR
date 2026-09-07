@@ -302,13 +302,17 @@ haplotype_frequencies <- function(x, variants = NULL, min_frequency = 0.01,
   if (is.null(variants)) idx <- seq_len(x$n_variants)
   else if (is.character(variants)) {
     variants <- as.character(variants)
-    if (length(variants) == 1L && grepl("|", variants, fixed = TRUE)) {
+    if (length(variants) == 1L && !is.na(variants) && grepl("|", variants, fixed = TRUE)) {
       variants <- strsplit(variants, "|", fixed = TRUE)[[1L]]
-      variants <- variants[nzchar(trimws(variants))]
+      variants <- trimws(variants)
     }
+    variants <- variants[!is.na(variants) & nzchar(variants)]
     idx <- match(variants, x$variants$id)
   }
   else idx <- as.integer(variants)
+  if (!length(idx)) {
+    .stopf("No variants were supplied. Check that at least one LD block was detected (nrow(blocks) > 0) before calling haplotype_frequencies().")
+  }
   if (anyNA(idx) || any(idx < 1L | idx > x$n_variants)) .stopf("Invalid variants.")
   if (length(idx) > 30L) .warnf("Inferring frequencies across %d variants may produce many rare haplotypes.", length(idx))
   phase_ok <- !is.null(x$haplotypes) &&

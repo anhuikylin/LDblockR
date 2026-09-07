@@ -391,10 +391,22 @@ delta_r2 <- ld_compare(group_ld, metric = "r2", reference = "Group_A")
 decay <- ld_decay(ld, metric = "r2", n_bins = 40)
 plot_ld_decay(decay)
 
+# A data-driven method can legitimately return zero blocks when its thresholds
+# are not met. Never index blocks$snps[1] before checking nrow(blocks).
+blocks_for_haplotype <- blocks
+if (!nrow(blocks_for_haplotype)) {
+  message("No Gabriel block was detected; using the bundled fixed intervals for this example.")
+  fixed <- read.table(regional[["fixed_blocks"]], header = TRUE, sep = "\t",
+                      stringsAsFactors = FALSE)
+  blocks_for_haplotype <- detect_ld_blocks(ld, method = "fixed", fixed = fixed)
+}
+if (!nrow(blocks_for_haplotype)) {
+  stop("No block is available for haplotype calculation; check the chromosome and coordinates.")
+}
+
 # Blocks store their SNP IDs as a | delimited string. Split it before passing
-# the IDs to haplotype_frequencies(); the function also accepts the original
-# single block string in LDblockR 0.0.1.
-block_snps <- strsplit(as.character(blocks$snps[1]), "|", fixed = TRUE)[[1]]
+# the IDs to haplotype_frequencies(); a single block string is also accepted.
+block_snps <- strsplit(blocks_for_haplotype$snps[1L], "|", fixed = TRUE)[[1L]]
 hap <- haplotype_frequencies(x, variants = block_snps)
 ```
 

@@ -14,7 +14,8 @@ haplotype_frequencies(
 \arguments{
 \item{x}{An `ld_data` object.}
 
-\item{variants}{Variant IDs or indices; all variants by default.}
+\item{variants}{Variant IDs, a single \code{|}-delimited block string, or indices;
+all variants by default.}
 
 \item{min_frequency}{Minimum reported frequency.}
 
