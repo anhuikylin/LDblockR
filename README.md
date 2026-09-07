@@ -2,8 +2,11 @@
 
 `LDblockR` is an installable R package for regional linkage disequilibrium (LD) analysis and visualization. It covers the main workflow of LDBlockShow while adding HapMap input, subpopulation comparisons, LD decay, haplotype frequency estimation, batch region processing, a pure R API, and automatic large-matrix rasterization.
 
-The current submitted version is **0.0.1**. Project homepage, source code, and issue tracking:
+The current submitted version is **0.0.1**. The canonical project repository, source code, and issue tracking are hosted on Gitee:
 <https://gitee.com/anhuikylin/LDblockR>.
+
+A public GitHub mirror is also available for code browsing and collaboration:
+<https://github.com/anhuikylin/LDblockR>.
 
 The package depends only on R's recommended components and does not require `ggplot2`, Bioconductor, or Java. Plain VCF/VCF.GZ files can be read directly; when `bcftools` is installed, indexed VCF region extraction is automatically accelerated.
 
@@ -30,17 +33,26 @@ The package depends only on R's recommended components and does not require `ggp
 ## Installation
 
 ```r
+# Preferred source (Gitee)
 pak::pak("git::https://gitee.com/anhuikylin/LDblockR.git")
+
+# Public GitHub mirror
+# pak::pak("git::https://github.com/anhuikylin/LDblockR.git")
+
 library(LDblockR)
 packageVersion("LDblockR")  # 0.0.1
 ```
 
 The package is a pure R source package and can be installed on Linux, macOS, and Windows without a compiler.
 
-You can also obtain the source code from Gitee and build locally:
+You can obtain the source code from either repository and build locally. The Gitee repository is the canonical source; the GitHub repository is a public mirror:
 
 ```bash
+# Gitee
 git clone https://gitee.com/anhuikylin/LDblockR.git
+# Alternatively, clone the GitHub mirror:
+# git clone https://github.com/anhuikylin/LDblockR.git
+
 R CMD build LDblockR
 R CMD INSTALL LDblockR_0.0.1.tar.gz
 ```
@@ -434,7 +446,7 @@ LDblockR -InVCF inst/extdata/example.vcf.gz -OutPut LDblockR_demo_alias \
 
 The repository includes the input files and archived reference outputs required to reproduce the numerical validation and manuscript figures. The regional synthetic bundle is stored in `inst/extdata/`, including `example.vcf.gz`, `example.hmp.txt`, `example_matrix.tsv`, `example_map.tsv`, `regional_gwas.tsv`, `example.gff3`, `example_fixed_blocks.tsv`, `example_special.tsv`, `subpopulation_A.txt`, `subpopulation_B.txt`, and `example_regions.tsv`. The PLINK examples are in `inst/extdata/plink/`. The archived pairwise reference table is `inst/extdata/reference/synthetic_reference_pairs.tsv`, and the externally generated LDBlockShow 1.41 outputs are in `inst/extdata/reference/ldblockshow/`.
 
-Figure 2 is generated from the bundled official rTASSEL maize tutorial data, not from an unprovided external file. The reproduction script performs six-input consistency checks, compares 861 synthetic SNP pairs, checks the archived LDBlockShow output, performs the maize QC/regional analysis, and writes the validation tables and figures:
+Figure 2 combines two explicitly documented sources. The regional demonstration uses the bundled synthetic genotype/GWAS/annotation files in `inst/extdata/`; these files are supplied for reproducible plotting and are not an external population dataset. The numerical validation compares 861 phased synthetic SNP pairs with the archived LDBlockShow 1.41 reference output. The official rTASSEL maize tutorial files are used separately for the maize QC and regional-analysis example. Thus, no missing file such as `population.vcf.gz` or `maize507.hmp.txt.gz` is required. The reproduction script performs the input-consistency checks, pairwise comparison, archived-output check, and maize analysis, then writes the validation tables and figures:
 
 ```bash
 Rscript scripts/reproduce_manuscript.R LDblockR_results
