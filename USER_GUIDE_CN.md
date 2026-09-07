@@ -338,8 +338,10 @@ Rscript scripts/reproduce_gwas_example.R EarHT_results annotation.gff3
 Rscript scripts/reproduce_integrated_region.R integrated_region_results
 ```
 
-论文 Figure 2 的复现使用仓库内随附的官方 TASSEL 玉米示例和归档验证结果，不需要另外寻找
-未随包提供的外部基因型文件。从源码目录运行：
+论文 Figure 2 的复现区分两类数据来源：区域示范图使用仓库内 `inst/extdata/` 的合成基因型、GWAS
+和注释文件；数值验证使用 861 对合成 SNP 与归档的 LDBlockShow 1.41 结果进行比较。官方 TASSEL
+玉米示例用于独立的玉米 QC 和区域分析示例。因此不需要寻找未随包提供的
+`population.vcf.gz` 或 `maize507.hmp.txt.gz` 等外部文件。从源码目录运行：
 
 ```bash
 Rscript scripts/reproduce_manuscript.R LDblockR_results
