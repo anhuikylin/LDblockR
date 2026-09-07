@@ -264,18 +264,18 @@ save_ld_plot(p_region, "Figure_integrated_regional_LD.png", width = 8.5, height 
 The key SNP track uses purple diamonds for lead SNPs, orange circles for tag SNPs, blue triangles for block boundaries, and red stars for `special` variants; colors can be customized via `key_snp_colors`.
 
 ```r
-# Define local intervals on the same chromosome using points above the threshold;
-# if no points exceed the threshold, the function falls back to the most significant SNP
-# and marks threshold_hit = FALSE in the result.
-cutline <- -log10(0.05 / nrow(gwas))
+# Use matching bundled regional GWAS and HapMap files in this runnable example.
+# Do not combine regional_gwas.tsv with the unrelated TASSEL HapMap panel.
+regional <- example_data("regional")
+gwas <- read_gwas(regional[["regional_gwas"]])
+cutline <- 5
 region_info <- gwas_ld_region(gwas, cutline = cutline, flank = 250000,
                               min_width = 100000)
 region <- region_info$region
 lead <- region_info$lead_id
 gwas_region <- region_info$selected
-lead_row <- gwas[gwas$id == lead, , drop = FALSE]
 
-ld_data <- read_hapmap(paths[["mdp_genotype"]], region = region,
+ld_data <- read_hapmap(regional[["hapmap"]], region = region,
                         min_maf = 0.05, max_missing = 0.20, quiet = TRUE)
 ld <- ld_compute(ld_data, measure = "r2", r2_method = "dosage")
 
@@ -283,13 +283,15 @@ p <- plot_ld(ld, metric = "r2", gwas = gwas_region, lead = lead,
               cutline = cutline, show_connectors = TRUE,
               palette = "publication", show_values = TRUE,
               gwas_color_by = "significance", show_maf = FALSE,
-              title = "Ear height mixed-model GWAS and regional LD",
+              title = "Bundled regional GWAS and LD",
               draw = FALSE)
-save_ld_plot(p, "Figure_LDblockR_EarHT.pdf", width = 8.5, height = 7.2)
-save_ld_plot(p, "Figure_LDblockR_EarHT.svg", width = 8.5, height = 7.2)
+save_ld_plot(p, "Figure_LDblockR_regional.pdf", width = 8.5, height = 7.2)
+save_ld_plot(p, "Figure_LDblockR_regional.svg", width = 8.5, height = 7.2)
 ```
 
 The `gwas` argument can be the table returned by `gwas_mlm()`, or you can write it to TSV first and pass it to `plot_ld()`; `read_gwas()` preserves columns such as `PVE`, `beta`, and `se`. For small regions, `show_values = TRUE` is recommended; for large regions, lossless rasterization is used automatically to control file size.
+
+The genotype panel and GWAS table must describe the same chromosome/position/marker set. `read_hapmap()`, `read_vcf_region()`, and `read_plink()` accept equivalent chromosome labels such as `1` and `chr1`, but they cannot create variants that are absent from the selected genotype file.
 
 Regarding speed and memory, the null-model eigen-decomposition is a single \(O(n^3)\) operation, and marker scanning uses BLAS matrix block operations; `chunk_size` controls peak memory (approximately `n × chunk_size` numeric values), and there is no per-SNP REML re-optimization. Increasing `chunk_size` typically improves throughput; on memory-constrained systems, reduce to 64 or 128. The statistical model and PVE definition remain unchanged.
 
@@ -373,8 +375,14 @@ x_matrix <- read_genotypes(regional[["matrix"]], format = "matrix", map = snp_ma
 regional <- example_data("regional")
 groups <- read.table(regional[["sample_groups"]], header = TRUE, sep = "\t",
                      stringsAsFactors = FALSE)
-group_ld <- ld_by_group(x, groups, measure = "both")
-delta_r2 <- ld_compare(group_ld, metric = "r2", reference = "Temperate")
+# Read all 60 samples. If x was read with subpopulation_A.txt, it contains
+# only one group and cannot be compared with Group_B.
+x_groups <- read_vcf_region(
+  regional[["vcf"]], region = "chr1:1000000-1100000",
+  min_maf = 0.01, max_missing = 0.25, quiet = TRUE
+)
+group_ld <- ld_by_group(x_groups, groups, measure = "both")
+delta_r2 <- ld_compare(group_ld, metric = "r2", reference = "Group_A")
 ```
 
 ## LD Decay and Haplotype Frequencies
@@ -383,14 +391,11 @@ delta_r2 <- ld_compare(group_ld, metric = "r2", reference = "Temperate")
 decay <- ld_decay(ld, metric = "r2", n_bins = 40)
 plot_ld_decay(decay)
 
-hap <- haplotype_frequencies(x, variants = blocks$snps[1])
-```
-
-For SNPs within a block, split the IDs first:
-
-```r
-block_snps <- strsplit(blocks$snps[1], "|", fixed = TRUE)[[1]]
-hap <- haplotype_frequencies(x, block_snps)
+# Blocks store their SNP IDs as a | delimited string. Split it before passing
+# the IDs to haplotype_frequencies(); the function also accepts the original
+# single block string in LDblockR 0.0.1.
+block_snps <- strsplit(as.character(blocks$snps[1]), "|", fixed = TRUE)[[1]]
+hap <- haplotype_frequencies(x, variants = block_snps)
 ```
 
 ## Batch Regions

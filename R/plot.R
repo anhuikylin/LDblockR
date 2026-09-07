@@ -61,8 +61,8 @@
     gwas <- read_gwas(gwas)
   }
   v_id <- as.character(variants$id)
-  v_key <- paste(as.character(variants$chr), as.numeric(variants$pos), sep = "\r")
-  g_key <- paste(as.character(gwas$chr), as.numeric(gwas$pos), sep = "\r")
+  v_key <- paste(.chr_key(variants$chr), as.numeric(variants$pos), sep = "\r")
+  g_key <- paste(.chr_key(gwas$chr), as.numeric(gwas$pos), sep = "\r")
   idx_id <- match(as.character(gwas$id), v_id)
   idx_key <- match(g_key, v_key)
   idx <- idx_id
@@ -70,7 +70,7 @@
   # Do not allow an ID collision at a different coordinate to misalign a
   # point; this is common when tables contain duplicate marker names.
   valid_id <- !is.na(idx) & is.finite(gwas$pos) &
-    as.character(variants$chr[idx]) == as.character(gwas$chr) &
+    .same_chr(variants$chr[idx], gwas$chr) &
     as.numeric(variants$pos[idx]) == as.numeric(gwas$pos)
   replace <- !valid_id
   idx[replace] <- idx_key[replace]

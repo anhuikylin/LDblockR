@@ -251,7 +251,12 @@ ld_by_group <- function(x, groups, ...) {
   }
   if (length(groups) != x$n_samples || anyNA(groups)) .stopf("Every sample must resolve to exactly one group.")
   lev <- unique(groups)
-  if (length(lev) < 2L) .stopf("At least two groups are required.")
+  if (length(lev) < 2L) {
+    counts <- table(groups, useNA = "ifany")
+    summary <- paste(sprintf("%s=%d", names(counts), as.integer(counts)), collapse = ", ")
+    .stopf("At least two groups are required after matching x$samples; found %d group (%s). Read x without a single-group samples filter and ensure the group-file sample IDs overlap x$samples.",
+           length(lev), summary)
+  }
   out <- setNames(lapply(lev, function(g) ld_compute(subset_ld_data(x, samples = groups == g), ...)), lev)
   class(out) <- c("ld_grouped", "list")
   out
@@ -285,7 +290,8 @@ ld_compare <- function(grouped, metric = c("r2", "dprime"), reference = 1L) {
 #' Estimate haplotype frequencies
 #'
 #' @param x An `ld_data` object.
-#' @param variants Variant IDs or indices; all variants by default.
+#' @param variants Variant IDs, a single `|`-delimited block string, or indices;
+#'   all variants by default.
 #' @param min_frequency Minimum reported frequency.
 #' @param drop_missing Drop chromosomes/samples with missing alleles.
 #' @return A haplotype frequency table.
@@ -294,7 +300,14 @@ haplotype_frequencies <- function(x, variants = NULL, min_frequency = 0.01,
                                   drop_missing = TRUE) {
   if (!inherits(x, "ld_data")) .stopf("x must be an ld_data object.")
   if (is.null(variants)) idx <- seq_len(x$n_variants)
-  else if (is.character(variants)) idx <- match(variants, x$variants$id)
+  else if (is.character(variants)) {
+    variants <- as.character(variants)
+    if (length(variants) == 1L && grepl("|", variants, fixed = TRUE)) {
+      variants <- strsplit(variants, "|", fixed = TRUE)[[1L]]
+      variants <- variants[nzchar(trimws(variants))]
+    }
+    idx <- match(variants, x$variants$id)
+  }
   else idx <- as.integer(variants)
   if (anyNA(idx) || any(idx < 1L | idx > x$n_variants)) .stopf("Invalid variants.")
   if (length(idx) > 30L) .warnf("Inferring frequencies across %d variants may produce many rare haplotypes.", length(idx))

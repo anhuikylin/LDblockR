@@ -19,6 +19,9 @@ stopifnot(xsub$n_variants == 10L, xsub$n_samples == 20L)
 xh <- read_hapmap(hmp, region, min_maf = 0.01, quiet = TRUE)
 stopifnot(xh$n_samples == 60L, xh$n_variants == 42L)
 stopifnot(all.equal(x$genotypes, xh$genotypes, check.attributes = FALSE) == TRUE)
+xh_numeric_chr <- read_hapmap(hmp, "1:1000000-1100000", min_maf = 0.01, quiet = TRUE)
+stopifnot(xh_numeric_chr$n_variants == 42L,
+          all.equal(xh_numeric_chr$genotypes, xh$genotypes, check.attributes = FALSE) == TRUE)
 
 mp <- read.table(map_file, header = TRUE, sep = "\t", stringsAsFactors = FALSE)
 xm <- read_genotypes(matrix_file, format = "matrix", map = mp)
@@ -77,6 +80,8 @@ neighbors <- ld_neighbors(ld, "snp21", threshold = 0.5)
 stopifnot("snp21" %in% neighbors$id)
 haps <- haplotype_frequencies(x, 1:5)
 stopifnot(abs(sum(haps$frequency) - 1) < 0.1, all(haps$frequency >= 0.01))
+block_haps <- haplotype_frequencies(x, "snp1|snp2|snp3")
+stopifnot(identical(attr(block_haps, "variants"), c("snp1", "snp2", "snp3")))
 decay <- ld_decay(ld, "r2", n_bins = 12L)
 stopifnot(nrow(decay) > 1L, all(decay$n_pairs > 0L))
 

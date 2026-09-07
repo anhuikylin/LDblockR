@@ -2,7 +2,8 @@
 
 本文件对应源码包 `LDblockR_0.0.1_source.zip` 和安装包
 `LDblockR_0.0.1.tar.gz`。项目主页为
-<https://gitee.com/anhuikylin/LDblockR>。包为纯 R 实现，要求 R ≥ 4.1.0，不依赖 Java、
+<https://gitee.com/anhuikylin/LDblockR>；GitHub 镜像为
+<https://github.com/anhuikylin/LDblockR>。包为纯 R 实现，要求 R ≥ 4.1.0，不依赖 Java、
 TASSEL、PLINK 或额外 CRAN 包。
 
 ## 安装
@@ -264,6 +265,11 @@ p <- plot_ld(ld, metric = "r2", gwas = gwas_region, lead = lead,
 save_ld_plot(p, "Figure_EarHT_LD.pdf", width = 8.5, height = 7.2)
 save_ld_plot(p, "Figure_EarHT_LD.svg", width = 8.5, height = 7.2)
 ```
+
+这里的 `gwas` 与 `paths[["mdp_genotype"]]` 必须来自同一基因型面板；如果使用内置区域
+示例的 `regional_gwas.tsv`，应同时使用 `example_data("regional")` 返回的
+`regional[["hapmap"]]`，不要与 TASSEL 的 `mdp_genotype.hmp.txt` 混用。区域读取会兼容
+`1` 与 `chr1` 这类染色体标签差异，但不会生成基因型文件中不存在的 marker。
 
 布局与参考图对应：
 

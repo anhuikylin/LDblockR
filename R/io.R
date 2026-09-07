@@ -65,8 +65,8 @@
       pos <- suppressWarnings(as.numeric(f[2L]))
       if (!is.finite(pos)) next
       if (!is.null(region)) {
-        if (chr != region$chr[1L] || pos < region$start[1L]) next
-        if (chr == region$chr[1L] && pos > region$end[1L]) {
+        if (!.same_chr(chr, region$chr[1L]) || pos < region$start[1L]) next
+        if (.same_chr(chr, region$chr[1L]) && pos > region$end[1L]) {
           done <- TRUE
           break
         }

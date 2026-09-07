@@ -59,9 +59,21 @@ parse_region <- function(region) {
   data.frame(chr = p[2L], start = start, end = end, stringsAsFactors = FALSE)
 }
 
+.chr_key <- function(x) {
+  z <- tolower(trimws(as.character(x)))
+  z[is.na(x)] <- NA_character_
+  sub("^chr", "", z)
+}
+
+.same_chr <- function(x, y) {
+  lhs <- .chr_key(x)
+  rhs <- .chr_key(y)
+  !is.na(lhs) & !is.na(rhs) & lhs == rhs
+}
+
 .in_region <- function(chr, pos, region) {
   if (is.null(region)) return(rep(TRUE, length(pos)))
-  as.character(chr) == region$chr[1L] & pos >= region$start[1L] & pos <= region$end[1L]
+  .same_chr(chr, region$chr[1L]) & pos >= region$start[1L] & pos <= region$end[1L]
 }
 
 .chromosome_rank <- function(chr) {
