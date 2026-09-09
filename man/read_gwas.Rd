@@ -36,7 +36,10 @@ A normalized data frame with `chr`, `pos`, `p`, `logp`, and `id`.
 Read regional association statistics
 }
 \details{
-A bare `regional_gwas.tsv` filename resolves to the bundled
-regional example after installation. Paths that include a directory are
-treated as user-supplied paths.
+A bare `regional_gwas.tsv` filename resolves to the bundled regional example
+after installation. Paths that include a directory are treated as user-supplied
+paths. EMMAX `.ps` files and common GAPIT, GEMMA, PLINK/PLINK2, and TASSEL column
+names are recognized automatically. When chromosome and position columns are
+absent, coordinates are recovered from common marker-ID forms such as
+`chr1.S_3279`, `chr1:3279`, and `1_3279`.
 }

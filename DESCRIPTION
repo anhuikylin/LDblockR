@@ -1,7 +1,7 @@
 Package: LDblockR
 Type: Package
 Title: Linkage Disequilibrium Blocks, Regional Association Tracks, and Haplotype Tools
-Version: 0.0.1
+Version: 0.3.0
 Authors@R: c(
     person("Xiaofeng", "Song", email = "songxiaofeng109@163.com", role = "aut"),
     person("Pengyu", "Chen", email = "15803747006@163.com", role = "aut"),
@@ -12,15 +12,19 @@ Maintainer: Fei Liang <fyliangfei@163.com>
 Description: Reads regional genotype data from VCF, HapMap, PLINK, or numeric
     matrices; calculates pairwise r-squared and Lewontin's D-prime; detects
     haplotype blocks; selects tag variants; summarizes LD decay and haplotype
-    frequencies; fits a fast GAPIT-principle mixed linear model GWAS with
-    marker-level and model-level PVE; and draws publication-ready Manhattan,
-    Q-Q, and LD heatmap figures aligned with association statistics, gene
-    models, blocks, tag SNPs, and highlighted variants. A one-call workflow
+    frequencies; fits a P3D-style single-variance-component mixed linear model
+    GWAS with marker-level and model-level PVE; and draws publication-ready
+    Manhattan, Q-Q, and LD heatmap figures aligned with association statistics,
+    gene models, blocks, tag SNPs, and highlighted variants. A one-call workflow
     and a command-line interface are included.
 License: MIT + file LICENSE
+URL: https://github.com/anhuikylin/LDblockR
+BugReports: https://github.com/anhuikylin/LDblockR/issues
 Encoding: UTF-8
 Depends: R (>= 4.1.0)
 Imports: graphics, grDevices, stats, utils
-Suggests: tools
+Suggests:
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3
 NeedsCompilation: no
 RoxygenNote: 7.3.3

@@ -5,5 +5,8 @@
 "_PACKAGE"
 
 .onAttach <- function(libname, pkgname) {
-  packageStartupMessage("LDblockR 0.0.1: regional LD, integrated visualization and GWAS diagnostics")
+  version <- tryCatch(as.character(utils::packageVersion(pkgname)), error = function(e) "development")
+  packageStartupMessage(
+    sprintf("LDblockR %s: regional LD, integrated visualization and GWAS diagnostics", version)
+  )
 }

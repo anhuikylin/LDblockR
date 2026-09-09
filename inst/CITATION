@@ -1,3 +1,5 @@
+version <- tryCatch(as.character(utils::packageVersion("LDblockR")), error = function(e) "development")
+
 bibentry(
   bibtype = "Manual",
   title = "LDblockR: An Object-Oriented R Framework for Reproducible Linkage Disequilibrium Analysis and Regional Visualization",
@@ -7,5 +9,5 @@ bibentry(
     person("Fei", "Liang")
   ),
   year = "2026",
-  note = "R package version 0.0.1; accompanying manuscript and source release"
+  note = paste("R package version", version)
 )

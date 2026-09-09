@@ -85,16 +85,64 @@ read_gff3 <- function(file, region = NULL,
   out
 }
 
-.has_header <- function(file) {
+.gwas_file_layout <- function(file) {
   con <- .open_text(file)
   on.exit(close(con), add = TRUE)
+  skip <- 0L
   repeat {
     line <- readLines(con, n = 1L, warn = FALSE)
-    if (!length(line)) return(FALSE)
-    if (nzchar(line) && !startsWith(trimws(line), "#")) break
+    if (!length(line)) return(list(header = FALSE, skip = skip, comment = "#"))
+    txt <- trimws(line)
+    if (!nzchar(txt)) {
+      skip <- skip + 1L
+      next
+    }
+    if (grepl("^#CHROM(?:[[:space:]]|$)", txt, ignore.case = TRUE)) {
+      return(list(header = TRUE, skip = skip, comment = ""))
+    }
+    if (startsWith(txt, "#")) {
+      skip <- skip + 1L
+      next
+    }
+    z <- strsplit(txt, "[[:space:],]+", perl = TRUE)[[1L]]
+    header <- any(grepl(
+      "^(chr|chrom|chromosome|pos|position|bp|ps|p|pval|pvalue|p_value|p\\.value|p_wald|p_lrt|p_score|logp|neglog10p|snp|marker|rs|id)$",
+      tolower(z)
+    ))
+    return(list(header = header, skip = skip, comment = "#"))
   }
-  z <- strsplit(trimws(line), "[[:space:],]+", perl = TRUE)[[1L]]
-  any(grepl("^(chr|chrom|chromosome|pos|position|bp|p|pval|pvalue|logp)$", tolower(z)))
+}
+
+.has_header <- function(file) .gwas_file_layout(file)$header
+
+.gwas_guess_format <- function(tab, source = NULL) {
+  low <- if (is.null(source)) "" else tolower(basename(source))
+  nms <- tolower(names(tab))
+  if (grepl("\\.ps(?:\\.(?:txt|gz))?$", low)) return("emmax")
+  if (any(c("p_wald", "p_lrt", "p_score") %in% nms) || all(c("rs", "ps") %in% nms)) return("gemma")
+  if (any(c("#chrom", "obs_ct", "test") %in% nms)) return("plink")
+  if (all(c("snp", "chromosome", "position") %in% nms) && any(c("p.value", "p_value", "p") %in% nms)) return("gapit")
+  if (all(c("marker", "chr", "pos") %in% nms) && any(c("trait", "f") %in% nms)) return("tassel")
+  "generic"
+}
+
+.gwas_coords_from_id <- function(id) {
+  z <- trimws(as.character(id))
+  pos <- rep(NA_real_, length(z))
+  chr <- rep(NA_character_, length(z))
+  # Common forms include chr1.S_3279, chr1:3279, 1_3279 and SNP_chr1_3279.
+  has_pos <- grepl("[._:][0-9]+(?:[._:][A-Za-z]+)*$", z, perl = TRUE)
+  if (any(has_pos)) {
+    pos_text <- sub("^.*[._:]([0-9]+)(?:[._:][A-Za-z]+)*$", "\\1", z[has_pos], perl = TRUE)
+    pos[has_pos] <- suppressWarnings(as.numeric(pos_text))
+    chr_text <- sub("^.*?((?:chr)?(?:[0-9]+|X|Y|Z|W|M|MT))[._:].*$", "\\1",
+                    z[has_pos], perl = TRUE, ignore.case = TRUE)
+    valid_chr <- grepl("^(?:chr)?(?:[0-9]+|X|Y|Z|W|M|MT)$", chr_text,
+                       perl = TRUE, ignore.case = TRUE)
+    idx <- which(has_pos)
+    chr[idx[valid_chr]] <- chr_text[valid_chr]
+  }
+  data.frame(chr = chr, pos = pos, stringsAsFactors = FALSE)
 }
 
 #' Read regional association statistics
@@ -108,16 +156,17 @@ read_gff3 <- function(file, region = NULL,
 #' @return A normalized data frame with `chr`, `pos`, `p`, `logp`, and `id`.
 #' @details A bare `regional_gwas.tsv` filename resolves to the bundled
 #' regional example after installation. Paths that include a directory are
-#' treated as user-supplied paths.
+#' treated as user-supplied paths. EMMAX `.ps` files and common GAPIT, GEMMA,
+#' PLINK/PLINK2, and TASSEL column names are recognized automatically. When
+#' chromosome and position columns are absent, coordinates are recovered from
+#' common marker-ID forms such as `chr1.S_3279`, `chr1:3279`, and `1_3279`.
 #' @export
 read_gwas <- function(x, region = NULL, chr_col = NULL, pos_col = NULL,
                       p_col = NULL, id_col = NULL, value_is_logp = FALSE,
                       header = NULL, sep = "") {
+  source_path <- NULL
   if (is.character(x) && length(x) == 1L) {
     if (!file.exists(x)) {
-      # Resolve a bare filename against the package's installed example data.
-      # Paths containing a directory are never redirected, so a typo in a
-      # user-supplied path still produces the usual missing-file error.
       bundled <- system.file("extdata", basename(x), package = "LDblockR")
       if (identical(dirname(x), ".") && nzchar(bundled) && file.exists(bundled)) {
         x <- bundled
@@ -125,32 +174,78 @@ read_gwas <- function(x, region = NULL, chr_col = NULL, pos_col = NULL,
         .stopf("GWAS file does not exist: %s. Use example_data(\"regional\") for the built-in regional example.", x)
       }
     }
-    if (is.null(header)) header <- .has_header(x)
+    source_path <- normalizePath(x, mustWork = FALSE)
+    layout <- .gwas_file_layout(x)
+    if (is.null(header)) header <- layout$header
     con <- .open_text(x)
     on.exit(close(con), add = TRUE)
-    tab <- utils::read.table(con, header = header, sep = sep, quote = "",
-                             comment.char = "#", check.names = FALSE,
-                             stringsAsFactors = FALSE)
+    tab <- utils::read.table(
+      con,
+      header = header,
+      sep = sep,
+      quote = "",
+      comment.char = layout$comment,
+      skip = layout$skip,
+      check.names = FALSE,
+      stringsAsFactors = FALSE
+    )
     if (!header) {
-      if (ncol(tab) < 3L) .stopf("Headerless GWAS input needs at least chr, position, and P/value columns.")
-      names(tab)[1:3] <- c("chr", "pos", "p")
+      if (ncol(tab) < 3L) .stopf("Headerless GWAS input needs at least three columns.")
+      if (grepl("\\.ps(?:\\.(?:txt|gz))?$", tolower(basename(source_path)))) {
+        names(tab)[1:3] <- c("id", "effect", "p")
+      } else {
+        names(tab)[1:3] <- c("chr", "pos", "p")
+      }
     }
   } else {
     tab <- as.data.frame(x, stringsAsFactors = FALSE)
   }
   if (!nrow(tab)) .stopf("GWAS table is empty.")
-  chr_col <- .null_coalesce(chr_col, .match_column(tab, c("chr", "chrom", "chromosome", "#chrom"), TRUE, "chromosome"))
-  pos_col <- .null_coalesce(pos_col, .match_column(tab, c("pos", "position", "bp", "site"), TRUE, "position"))
+
+  detected_format <- .gwas_guess_format(tab, source_path)
+  if (is.null(id_col)) {
+    id_col <- .match_column(tab, c("id", "snp", "marker", "rsid", "rs", "name", "variant", "variant_id"), FALSE)
+  }
+  if (is.null(chr_col)) {
+    chr_col <- .match_column(tab, c("chr", "chrom", "chromosome", "#chrom"), FALSE)
+  }
+  if (is.null(pos_col)) {
+    pos_col <- .match_column(tab, c("pos", "position", "bp", "site", "ps", "base_pair", "basepair"), FALSE)
+  }
+
+  if ((is.null(chr_col) || is.null(pos_col)) && !is.null(id_col)) {
+    coords <- .gwas_coords_from_id(tab[[id_col]])
+    if (is.null(chr_col) && any(!is.na(coords$chr))) {
+      tab$.LDblockR_chr <- coords$chr
+      chr_col <- ".LDblockR_chr"
+    }
+    if (is.null(pos_col) && any(is.finite(coords$pos))) {
+      tab$.LDblockR_pos <- coords$pos
+      pos_col <- ".LDblockR_pos"
+    }
+  }
+  if (is.null(chr_col)) {
+    .stopf("Cannot find chromosome information. Supply chr_col or use marker IDs such as chr1.S_3279 or chr1:3279.")
+  }
+  if (is.null(pos_col)) {
+    .stopf("Cannot find position information. Supply pos_col or use marker IDs containing genomic coordinates.")
+  }
+
   if (is.null(p_col)) {
-    p_col <- .match_column(tab, c("p", "pval", "pvalue", "p_value", "p.value", "logp", "neglog10p", "value"), TRUE, "P/value")
-    if (tolower(p_col) %in% c("logp", "neglog10p")) value_is_logp <- TRUE
+    p_col <- .match_column(
+      tab,
+      c("p", "pval", "pvalue", "p_value", "p.value", "p_wald", "p_lrt", "p_score",
+        "p-value", "p_value_wald", "logp", "neglog10p", "minus_log10_p", "value"),
+      TRUE, "P/value"
+    )
+    if (tolower(p_col) %in% c("logp", "neglog10p", "minus_log10_p")) value_is_logp <- TRUE
   }
   pve_col <- .match_column(tab, c("PVE", "pve", "var_explained", "variance_explained",
                                  "percent_variance_explained"), FALSE)
-  beta_col <- .match_column(tab, c("beta", "effect", "estimate", "coefficient"), FALSE)
-  se_col <- .match_column(tab, c("se", "stderr", "standard_error"), FALSE)
-  if (is.null(id_col)) id_col <- .match_column(tab, c("id", "snp", "marker", "rsid", "name"), FALSE)
-  value <- as.numeric(tab[[p_col]])
+  beta_col <- .match_column(tab, c("beta", "effect", "estimate", "coefficient", "effect_size"), FALSE)
+  se_col <- .match_column(tab, c("se", "stderr", "standard_error", "std_err"), FALSE)
+
+  value <- suppressWarnings(as.numeric(as.character(tab[[p_col]])))
   if (value_is_logp) {
     logp <- value
     p <- 10^(-value)
@@ -159,16 +254,23 @@ read_gwas <- function(x, region = NULL, chr_col = NULL, pos_col = NULL,
     logp <- .safe_log10(p)
   }
   out <- data.frame(
-    chr = as.character(tab[[chr_col]]), pos = as.numeric(tab[[pos_col]]),
-    p = p, logp = logp,
+    chr = as.character(tab[[chr_col]]),
+    pos = suppressWarnings(as.numeric(as.character(tab[[pos_col]]))),
+    p = p,
+    logp = logp,
     id = if (is.null(id_col)) paste0(tab[[chr_col]], ":", tab[[pos_col]]) else as.character(tab[[id_col]]),
     stringsAsFactors = FALSE
   )
-  if (!is.null(pve_col)) out$PVE <- as.numeric(tab[[pve_col]])
-  if (!is.null(beta_col)) out$beta <- as.numeric(tab[[beta_col]])
-  if (!is.null(se_col)) out$se <- as.numeric(tab[[se_col]])
-  out <- out[is.finite(out$pos) & is.finite(out$logp) & .in_region(out$chr, out$pos, parse_region(region)), , drop = FALSE]
-  out <- out[order(.chromosome_rank(out$chr), out$chr, out$pos), , drop = FALSE]
+  if (!is.null(pve_col)) out$PVE <- suppressWarnings(as.numeric(as.character(tab[[pve_col]])))
+  if (!is.null(beta_col)) out$beta <- suppressWarnings(as.numeric(as.character(tab[[beta_col]])))
+  if (!is.null(se_col)) out$se <- suppressWarnings(as.numeric(as.character(tab[[se_col]])))
+  valid <- is.finite(out$pos) & is.finite(out$logp) & !is.na(out$chr) & nzchar(out$chr)
+  if (!value_is_logp) valid <- valid & is.finite(out$p) & out$p >= 0 & out$p <= 1
+  out <- out[valid & .in_region(out$chr, out$pos, parse_region(region)), , drop = FALSE]
+  if (!nrow(out)) .stopf("No finite GWAS rows remain after coordinate and P-value normalization.")
+  out <- out[order(.chromosome_rank(out$chr), out$chr, out$pos, out$id), , drop = FALSE]
   rownames(out) <- NULL
+  attr(out, "gwas_format") <- detected_format
+  attr(out, "source") <- source_path
   out
 }

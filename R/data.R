@@ -1,3 +1,16 @@
+.ld_history_entry <- function(step, parameters = list(), details = list()) {
+  list(
+    step = as.character(step)[1L],
+    timestamp = format(Sys.time(), "%Y-%m-%d %H:%M:%S %z"),
+    parameters = parameters,
+    details = details
+  )
+}
+
+.ld_package_version <- function() {
+  tryCatch(as.character(utils::packageVersion("LDblockR")), error = function(e) NA_character_)
+}
+
 #' Construct an LD genotype object
 #'
 #' @param genotypes Numeric matrix coded 0/1/2, with samples in rows.
@@ -23,10 +36,8 @@ as_ld_data <- function(genotypes, map = NULL, sample_ids = NULL,
   rownames(genotypes) <- sample_ids
   variants <- .normalize_map(map, ncol(genotypes), colnames(genotypes))
   if (any(!is.finite(variants$pos))) .stopf("Variant positions must be finite numbers.")
-  variants$id[is.na(variants$id) | !nzchar(variants$id)] <- paste0(
-    variants$chr[is.na(variants$id) | !nzchar(variants$id)], ":",
-    variants$pos[is.na(variants$id) | !nzchar(variants$id)]
-  )
+  missing_id <- is.na(variants$id) | !nzchar(variants$id)
+  variants$id[missing_id] <- paste0(variants$chr[missing_id], ":", variants$pos[missing_id])
   variants$id <- make.unique(variants$id)
   ord <- order(.chromosome_rank(variants$chr), variants$chr, variants$pos, variants$id)
   variants <- variants[ord, , drop = FALSE]
@@ -50,6 +61,7 @@ as_ld_data <- function(genotypes, map = NULL, sample_ids = NULL,
   if (length(duplicate_stats)) variants[duplicate_stats] <- NULL
   variants <- cbind(variants, stats)
   rownames(variants) <- NULL
+  created_at <- format(Sys.time(), "%Y-%m-%d %H:%M:%S %z")
   out <- list(
     genotypes = genotypes,
     variants = variants,
@@ -57,7 +69,18 @@ as_ld_data <- function(genotypes, map = NULL, sample_ids = NULL,
     haplotypes = haplotypes,
     source = source,
     n_samples = nrow(genotypes),
-    n_variants = ncol(genotypes)
+    n_variants = ncol(genotypes),
+    provenance = list(
+      source = source,
+      created_at = created_at,
+      package_version = .ld_package_version()
+    ),
+    history = list(
+      .ld_history_entry(
+        "construct",
+        details = list(n_samples = nrow(genotypes), n_variants = ncol(genotypes), phased = !is.null(haplotypes))
+      )
+    )
   )
   class(out) <- "ld_data"
   out
@@ -71,6 +94,7 @@ print.ld_data <- function(x, ...) {
   cat("  mean MAF:", format(mean(x$variants$maf, na.rm = TRUE), digits = 3),
       " | mean missing:", format(mean(x$variants$missing_rate, na.rm = TRUE), digits = 3), "\n")
   if (!is.null(x$source)) cat("  source:", x$source, "\n")
+  if (length(x$history)) cat("  history entries:", length(x$history), "\n")
   invisible(x)
 }
 
@@ -98,6 +122,21 @@ filter_variants <- function(x, min_maf = 0.05, max_maf = 0.5,
            min_maf, max_missing, max_het)
   }
   out <- subset_ld_data(x, variants = keep)
+  out$provenance <- x$provenance
+  out$history <- c(
+    x$history,
+    list(.ld_history_entry(
+      "filter_variants",
+      parameters = list(
+        min_maf = min_maf,
+        max_maf = max_maf,
+        max_missing = max_missing,
+        max_het = max_het,
+        min_hwe_p = min_hwe_p
+      ),
+      details = list(before = x$n_variants, after = out$n_variants)
+    ))
+  )
   if (!quiet) message(sprintf("Retained %d of %d variants after filtering.", out$n_variants, x$n_variants))
   out
 }
@@ -135,6 +174,20 @@ subset_ld_data <- function(x, variants = NULL, samples = NULL) {
     hap <- x$haplotypes[hi, vi, drop = FALSE]
   }
   map_cols <- setdiff(names(x$variants), c("af", "maf", "missing_rate", "het_rate", "call_count", "hwe_p"))
-  as_ld_data(x$genotypes[si, vi, drop = FALSE], x$variants[vi, map_cols, drop = FALSE],
-             sample_ids = x$samples[si], haplotypes = hap, source = x$source)
+  out <- as_ld_data(x$genotypes[si, vi, drop = FALSE], x$variants[vi, map_cols, drop = FALSE],
+                    sample_ids = x$samples[si], haplotypes = hap, source = x$source)
+  out$provenance <- x$provenance
+  out$history <- c(
+    x$history,
+    list(.ld_history_entry(
+      "subset_ld_data",
+      details = list(
+        samples_before = x$n_samples,
+        samples_after = out$n_samples,
+        variants_before = x$n_variants,
+        variants_after = out$n_variants
+      )
+    ))
+  )
+  out
 }
